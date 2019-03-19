@@ -1,0 +1,8 @@
+#ÅäÖÃÊı¾İ¿â
+[database]
+dbhost=
+dbport=
+dbname=
+dbuser=
+dbpassword=
+dbcharset=
