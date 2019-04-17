@@ -1,8 +1,8 @@
 #ÅäÖÃÊı¾İ¿â
 [database]
-dbhost=
-dbport=
-dbname=
-dbuser=
-dbpassword=
-dbcharset=
+dbhost=127.0.0.1
+dbport=3366
+dbname=test
+dbuser=root
+dbpassword=admin
+dbcharset=utf8

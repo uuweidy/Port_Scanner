@@ -1,14 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-生成程序主界面并运行程序
-Created on 2018/10/17 18:52
-
+Created on 2019/3/19 16:46
+生成程序的图形界面
 """
-
 from tkinter import *
+from tkinter import ttk
 import tkinter.messagebox
-import portScanner
-from dbconnect import *
+import datetime
+import time
+import portscanner
+import dbconnect
+import threading
+import win_set
+
 
 method = [
     ("对单端口扫描", 1),
@@ -18,17 +22,18 @@ method = [
 ]       # 包含四种扫描方法的列表
 
 
-class ScannerGUI(object):
-
+class Gui(object):
     def __init__(self):         # 生成GUI
-        self.scanner = portScanner.Portscanner()
+        self.ps = portscanner.Portscanner()
+        self.dbc = dbconnect.DBConnecter()
 
-        root = tkinter.Tk()     # 生成主窗口，设定标题和窗口大小为不可变（防止出现奇怪的东西）
-        root.title("端口扫描器")
-        root.resizable(False, False)
+        self.root = tkinter.Tk()     # 生成主窗口，设定标题和窗口大小为不可变（防止出现奇怪的东西）
+        self.root.title("端口扫描器")
+        self.root.resizable(False, False)
+        win_set.center_window(self.root, 400, 320)
 
-        self.input_frame = Frame(root).pack(side=LEFT)  # 将窗口分为左右两边
-        self.output_frame = Frame(root)
+        self.input_frame = Frame(self.root).pack(side=LEFT)  # 将窗口分为左右两边
+        self.output_frame = Frame(self.root)
         self.output_frame.pack(side=RIGHT)
 
         # 以下为生成输入栏的代码
@@ -56,8 +61,8 @@ class ScannerGUI(object):
             b = tkinter.Radiobutton(self.lf, text=i, variable=self.v, value=j, command=self.change_method)
             b.pack(anchor='w')
 
-        self.check_button = tkinter.Button(root, text='确认', command=self.click_button).pack()
-        self.frame3 = Frame(root, padx=5, pady=5)
+        self.check_button = tkinter.Button(self.root, text='确认', command=self.click_button).pack()
+        self.frame3 = Frame(self.root, padx=5, pady=5)
         self.frame3.pack()
         self.ifout = IntVar()
         self.cb = Checkbutton(self.frame3, text='导入到数据库', variable=self.ifout, padx=5, pady=5)
@@ -68,7 +73,7 @@ class ScannerGUI(object):
         self.label2 = Label(self.output_frame, text='扫描结果:             ', padx=15).pack()
         self.listbox = Listbox(self.output_frame, listvariable=self.output, height=14, width=15)
         self.listbox.pack()
-
+        # TODO: 版本号需要修改
         self.info = Label(self.output_frame, text='version:2.2.4    制作者:杜雨威', padx=5, pady=5)
         self.info.pack(side=BOTTOM)
 
@@ -76,7 +81,7 @@ class ScannerGUI(object):
         self.init_args()
 
         # 进入循环
-        root.mainloop()
+        self.root.mainloop()
 
     def init_args(self):        # 对窗口中的默认参数进行设置
         self.ip.set('127.0.0.1')
@@ -86,26 +91,7 @@ class ScannerGUI(object):
         self.change_method()
         self.ifout.set(0)
 
-    def click_button(self):     # 点击确定按钮时执行的程序
-        # 将参数传入scannner中并扫描
-        self.scanner.ip = self.ip.get()
-        self.scanner.start_port = int(self.startportnum.get())
-        self.scanner.end_port = int(self.endportnum.get())
-        self.scanner.method = self.v.get()
-        self.scanner.port_scan()
-        ans = ['共'+str(len(self.scanner.ans))+'个结果'] + self.scanner.ans
-        print(ans)
-        print(self.scanner.ans)
-        self.output.set(ans)
-        t = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')   # 生成时间戳
-        if self.ifout.get() == 1:
-            b = create_table()
-            if not b:
-                tkinter.messagebox.showinfo(title='提示', message='未搜索到名为results的表格，已为您创建。')
-            db_insert(self.scanner.ip, self.scanner.ans, t)         # 导入数据库
-        tkinter.messagebox.showinfo(title='信息', message='搜索结束！')    # 提示搜索结束
-
-    def change_method(self):      # 变换方法时界面做出的响应
+    def change_method(self):  # 变换方法时界面做出的响应
         selection = int(self.v.get())
         if selection == 1:
             self.e2['state'] = 'normal'
@@ -117,7 +103,48 @@ class ScannerGUI(object):
             self.e2['state'] = 'disabled'
             self.e3['state'] = 'disabled'
 
+    def init_schedule(self):
+        global pb
+        root = Tk()
+        win_set.center_window(root, 200, 20)
+        pb = root
+        root.title("进度条")
+        p = ttk.Progressbar(root, length=200, mode="indeterminate", orient=HORIZONTAL)
+        p.grid(row=1, column=1)
+        p["maximum"] = 100
+        p["value"] = 0
+        p.start(10)
+        root.mainloop()
+
+    def click_button(self):     # 点击确定按钮时执行的程序
+        global pb
+        # 将参数传入scannner中并扫描
+        self.ps.ip = self.ip.get()
+        self.ps.start_port = int(self.startportnum.get())
+        self.ps.end_port = int(self.endportnum.get())
+        self.ps.method = self.v.get()
+        start_time = time.time()
+        # self.init_schedule()
+        t = threading.Thread(target=self.init_schedule)
+        t.start()
+        self.ps.port_scan()
+        pb.quit()
+        end_time = time.time()
+        ans = ['共'+str(len(self.ps.ans))+'个结果'] + self.ps.ans
+        print(ans)
+        # print(self.ps.ans)
+        self.output.set(ans)
+        t = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')   # 生成时间戳
+        if self.ifout.get() == 1:
+            try:
+                b = self.dbc.create_table()
+                if not b:
+                    tkinter.messagebox.showinfo(title='提示', message='未搜索到名为results的表格，已为您创建。')
+                self.dbc.db_insert(self.ps.ip, self.ps.ans, t)         # 导入数据库
+            except Exception as e:
+                tkinter.messagebox.showerror(title='错误', message=e)
+        tkinter.messagebox.showinfo(title='信息', message='搜索结束！耗时{0:.2f}秒'.format(end_time-start_time))    # 提示搜索结束
+
 
 if __name__ == "__main__":
-    # 主程序入口
-    app = ScannerGUI()
+    app = Gui()

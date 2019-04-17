@@ -1,32 +1,37 @@
 # -*- coding: utf-8 -*-
 """
-读取与当前文件在同一目录下的配置文件的信息
-Created on 2018/10/24 9:33
+Created on 2019/3/19 15:45
+读取当前目录下的配置文件
 
 """
-
 import configparser
 import os
 import sys
 import tkinter.messagebox
 
 
-def getConfig(section, key):
+def getConfig(ini, section, key):
     config = configparser.ConfigParser()
-    path = os.path.split(os.path.realpath(sys.argv[0]))[0] + '/dbcfg.txt'
-    # 其中 os.path.split(os.path.realpath(__file__))[0] 得到的是当前文件模块的目录
+    path = os.path.split(os.path.realpath(sys.argv[0]))[0] + ini
+    # 其中 os.path.split(os.path.realpath(sys.argv[0]))[0] 得到的是当前文件模块的目录
     config.read(path)               # 读取配置文件
+    v = -1
     try:
         v = config.get(section, key)
     except configparser.NoSectionError:
-        tkinter.messagebox.showerror(title='警告', message='未找到配置文件，请确保配置文件的位置为:'
-                                                         + os.path.split(os.path.realpath(sys.argv[0]))[0] + '!')
-        # 输出错误信息，提示文件路径
+        if len(config.sections()) == 0:
+            tkinter.messagebox.showerror(title='错误', message='未找到配置文件，请确保配置文件的位置为:'
+                                                             + os.path.split(os.path.realpath(sys.argv[0]))[0] + '!')
+        else:
+            tkinter.messagebox.showerror(title='错误', message='未找到Section: {}，请修改配置文件'.format(section))
+    except configparser.NoOptionError:
+        tkinter.messagebox.showerror(title='错误', message='未找到Option: {}，请修改配置文件'.format(key))
     return v
 
 
 if __name__ == '__main__':
     # 测试代码，输出配置文件中的信息
-    # dbname = getConfig('database', 'dbname')
-    print(getConfig('database', 'dbhost'), getConfig('database', 'dbuser'),
-          getConfig('database', 'dbpassword'), getConfig('database', 'dbname'))
+    ini = '/dbcfg.txt'
+    print(getConfig(ini, 'database', 'dbhost'), getConfig(ini, 'database', 'dbuser'),
+          getConfig(ini, 'database', 'dbpassword'), getConfig(ini, 'database', 'dbname'))
+
